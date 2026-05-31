@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#146c5f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="English Lab" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>English Family Lab</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#today" aria-label="English Family Lab">
+          <img src="./assets/icon.svg" alt="" class="brand-mark" />
+          <span>
+            <strong>English Family Lab</strong>
+            <small id="profileLine">Study · Intermediate</small>
+          </span>
+        </a>
+        <div class="top-actions">
+          <button id="speakButton" class="icon-button" type="button" aria-label="Phat am tu hien tai">▶</button>
+          <button id="localeButton" class="locale-button" type="button" aria-label="Doi ngon ngu">VI</button>
+        </div>
+      </header>
+
+      <main id="app" class="main-content" aria-live="polite"></main>
+
+      <nav class="bottom-nav" aria-label="Dieu huong chinh">
+        <button class="nav-item is-active" data-tab="today" type="button">
+          <span class="nav-icon">⌂</span>
+          <span data-i18n="navToday">Hôm nay</span>
+        </button>
+        <button class="nav-item" data-tab="vocab" type="button">
+          <span class="nav-icon">Aa</span>
+          <span data-i18n="navVocab">Từ vựng</span>
+        </button>
+        <button class="nav-item" data-tab="grammar" type="button">
+          <span class="nav-icon">§</span>
+          <span data-i18n="navGrammar">Grammar</span>
+        </button>
+        <button class="nav-item" data-tab="progress" type="button">
+          <span class="nav-icon">▦</span>
+          <span data-i18n="navProgress">Tiến độ</span>
+        </button>
+        <button class="nav-item" data-tab="settings" type="button">
+          <span class="nav-icon">⚙</span>
+          <span data-i18n="navSettings">Cài đặt</span>
+        </button>
+      </nav>
+    </div>
+
+    <template id="wordCardTemplate">
+      <article class="word-card">
+        <div class="word-card-head">
+          <div>
+            <span class="pill" data-slot="level"></span>
+            <h1 data-slot="word"></h1>
+            <p class="phonetic" data-slot="phonetic"></p>
+          </div>
+          <button class="round-button" type="button" data-action="save" aria-label="Luu tu">☆</button>
+        </div>
+        <p class="word-meaning" data-slot="meaning"></p>
+        <p class="word-note" data-slot="note"></p>
+        <div class="example-block">
+          <p data-slot="example"></p>
+          <small data-slot="exampleVi"></small>
+        </div>
+        <div class="meta-grid">
+          <div>
+            <strong data-i18n="wordFamily">Word family</strong>
+            <div class="chip-row" data-slot="family"></div>
+          </div>
+          <div>
+            <strong data-i18n="grammarMap">Grammar map</strong>
+            <div class="chip-row" data-slot="grammar"></div>
+          </div>
+        </div>
+        <div class="review-actions">
+          <button class="review-button muted" type="button" data-rating="again" data-i18n="again">Quên</button>
+          <button class="review-button warn" type="button" data-rating="hard" data-i18n="hard">Khó</button>
+          <button class="review-button ok" type="button" data-rating="good" data-i18n="good">Ổn</button>
+          <button class="review-button strong" type="button" data-rating="easy" data-i18n="easy">Dễ</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
