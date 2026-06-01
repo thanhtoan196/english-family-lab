@@ -80,9 +80,14 @@ const labels = {
     syncDown: "Tải từ cloud",
     cloudReady: "Đã kết nối cloud",
     cloudMissing: "Chưa cấu hình Supabase",
+    cloudConfigured: "Đã lưu cấu hình, chưa đăng nhập",
+    cloudLastSync: "Lần đồng bộ gần nhất",
     loginSent: "Đã gửi link đăng nhập",
     syncDone: "Đã đồng bộ",
     syncFailed: "Đồng bộ chưa thành công",
+    cloudNeedLogin: "Chưa đăng nhập cloud. Bấm Gửi link đăng nhập trước.",
+    cloudNeedConfig: "Thiếu Supabase URL hoặc anon key.",
+    cloudNeedEmail: "Thiếu email đăng nhập.",
     selected: "Đang chọn",
     nextReview: "Ôn lại",
     todayQueue: "Queue hôm nay",
@@ -170,9 +175,14 @@ const labels = {
     syncDown: "Load from cloud",
     cloudReady: "Cloud connected",
     cloudMissing: "Supabase is not configured",
+    cloudConfigured: "Config saved, not signed in",
+    cloudLastSync: "Last sync",
     loginSent: "Login link sent",
     syncDone: "Synced",
     syncFailed: "Sync failed",
+    cloudNeedLogin: "Not signed in. Send a login link first.",
+    cloudNeedConfig: "Supabase URL or anon key is missing.",
+    cloudNeedEmail: "Email is missing.",
     selected: "Selected",
     nextReview: "Review",
     todayQueue: "Today queue",
@@ -797,8 +807,38 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function readCloudFormIntoState() {
+  const form = document.querySelector("[data-cloud-form]");
+  if (!form) return;
+  const data = new FormData(form);
+  const nextUrl = String(data.get("supabaseUrl") || "").trim();
+  const nextKey = String(data.get("supabaseAnonKey") || "").trim();
+  state.cloud.email = String(data.get("email") || "").trim();
+  if (nextUrl !== state.cloud.supabaseUrl || nextKey !== state.cloud.supabaseAnonKey) {
+    window.__englishLabSupabase = null;
+  }
+  state.cloud.supabaseUrl = nextUrl;
+  state.cloud.supabaseAnonKey = nextKey;
+  saveState();
+}
+
+function recordCloudError(error) {
+  const message = error?.message || t("syncFailed");
+  state.cloud.status = message;
+  saveState();
+  showToast(message);
+  render();
+}
+
+function cloudStatusText() {
+  if (state.cloud?.userId) return t("cloudReady");
+  if (state.cloud?.supabaseUrl && state.cloud?.supabaseAnonKey) return t("cloudConfigured");
+  return t("cloudMissing");
+}
+
 function getSupabaseClient() {
-  if (!state.cloud?.supabaseUrl || !state.cloud?.supabaseAnonKey || !window.supabase?.createClient) return null;
+  if (!state.cloud?.supabaseUrl || !state.cloud?.supabaseAnonKey) throw new Error(t("cloudNeedConfig"));
+  if (!window.supabase?.createClient) throw new Error("Supabase library is not loaded");
   window.__englishLabSupabase ||= window.supabase.createClient(state.cloud.supabaseUrl, state.cloud.supabaseAnonKey, {
     auth: { persistSession: true, detectSessionInUrl: true },
   });
@@ -813,7 +853,6 @@ function serializableCloudState() {
 
 async function refreshCloudSession() {
   const client = getSupabaseClient();
-  if (!client) return null;
   const { data } = await client.auth.getSession();
   const userId = data?.session?.user?.id || "";
   if (userId && state.cloud.userId !== userId) {
@@ -825,7 +864,7 @@ async function refreshCloudSession() {
 
 async function sendLoginLink(email) {
   const client = getSupabaseClient();
-  if (!client) throw new Error("Supabase not configured");
+  if (!email) throw new Error(t("cloudNeedEmail"));
   const redirectTo = `${location.origin}${location.pathname}`;
   const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
   if (error) throw error;
@@ -834,7 +873,7 @@ async function sendLoginLink(email) {
 async function syncUpToCloud() {
   const client = getSupabaseClient();
   const session = await refreshCloudSession();
-  if (!client || !session?.user?.id) throw new Error("No cloud session");
+  if (!client || !session?.user?.id) throw new Error(t("cloudNeedLogin"));
   const { error } = await client.from("learning_states").upsert({
     user_id: session.user.id,
     state: serializableCloudState(),
@@ -849,7 +888,7 @@ async function syncUpToCloud() {
 async function syncDownFromCloud() {
   const client = getSupabaseClient();
   const session = await refreshCloudSession();
-  if (!client || !session?.user?.id) throw new Error("No cloud session");
+  if (!client || !session?.user?.id) throw new Error(t("cloudNeedLogin"));
   const { data, error } = await client.from("learning_states").select("state").eq("user_id", session.user.id).single();
   if (error && error.code !== "PGRST116") throw error;
   if (data?.state) {
@@ -1642,7 +1681,13 @@ function renderSettings() {
       </section>
       <section class="settings-card">
         <h3>${t("cloudSync")}</h3>
-        <p>${state.cloud?.userId ? t("cloudReady") : t("cloudMissing")}</p>
+        <p>${cloudStatusText()}</p>
+        ${
+          state.cloud?.lastSyncAt
+            ? `<p>${t("cloudLastSync")}: ${escapeHtml(new Date(state.cloud.lastSyncAt).toLocaleString(state.locale === "vi" ? "vi-VN" : "en-US"))}</p>`
+            : ""
+        }
+        ${state.cloud?.status && state.cloud.status !== "ok" ? `<p>${escapeHtml(state.cloud.status)}</p>` : ""}
         <form class="settings-grid" data-cloud-form>
           <div class="field">
             <label for="supabaseUrl">${t("supabaseUrl")}</label>
@@ -1826,25 +1871,28 @@ function bindEvents() {
       render();
     }
     if (target.dataset.action === "send-login") {
+      readCloudFormIntoState();
       sendLoginLink(state.cloud.email)
         .then(() => showToast(t("loginSent")))
-        .catch(() => showToast(t("syncFailed")));
+        .catch(recordCloudError);
     }
     if (target.dataset.action === "sync-up") {
+      readCloudFormIntoState();
       syncUpToCloud()
         .then(() => {
           showToast(t("syncDone"));
           render();
         })
-        .catch(() => showToast(t("syncFailed")));
+        .catch(recordCloudError);
     }
     if (target.dataset.action === "sync-down") {
+      readCloudFormIntoState();
       syncDownFromCloud()
         .then(() => {
           showToast(t("syncDone"));
           render();
         })
-        .catch(() => showToast(t("syncFailed")));
+        .catch(recordCloudError);
     }
     if (target.dataset.action === "reset") {
       localStorage.removeItem(STORAGE_KEY);
@@ -1909,11 +1957,8 @@ function bindEvents() {
       addProfile(String(name || ""));
     }
     if (cloudForm) {
-      const data = new FormData(cloudForm);
-      state.cloud.supabaseUrl = String(data.get("supabaseUrl") || "").trim();
-      state.cloud.supabaseAnonKey = String(data.get("supabaseAnonKey") || "").trim();
-      state.cloud.email = String(data.get("email") || "").trim();
-      window.__englishLabSupabase = null;
+      readCloudFormIntoState();
+      state.cloud.status = "";
       saveState();
       showToast(t("profileSaved"));
       render();
