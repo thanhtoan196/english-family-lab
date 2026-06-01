@@ -6,12 +6,14 @@ const labels = {
     navToday: "Hôm nay",
     navVocab: "Từ vựng",
     navGrammar: "Grammar",
+    navExercises: "Bài tập",
     navProgress: "Tiến độ",
     navSettings: "Cài đặt",
     todayTitle: "Hôm nay",
     todaySub: "Từ mới, ôn lại, streak và mục tiêu trong ngày.",
     start: "Bắt đầu",
     nextWord: "Từ tiếp",
+    shuffle: "Trộn từ",
     lookup: "Tra từ",
     lookupPlaceholder: "Nhập từ tiếng Anh",
     source: "Nguồn",
@@ -52,9 +54,35 @@ const labels = {
     installNote: "PWA static, dùng được trên iPhone/iPad qua Add to Home Screen.",
     attribution: "Dictionary data: dictionaryapi.dev",
     grammarPractice: "Luyện nhanh",
+    nextQuestion: "Câu tiếp",
+    tryAgain: "Làm lại",
+    explanation: "Giải thích",
+    exercisesTitle: "Bài tập",
+    exercisesSub: "Trắc nghiệm từ vựng và grammar đã học qua.",
+    profile: "Người học",
+    addProfile: "Thêm người học",
+    profileName: "Tên người học",
+    activeProfile: "Đang học",
+    dailyLesson: "Bài hôm nay",
+    lessonReady: "Bài học hôm nay đã sẵn sàng",
+    reviewFirst: "Hãy học vài từ trước, app sẽ tạo bài tập cá nhân hơn.",
     writingLab: "Sửa câu",
     writingPlaceholder: "Viết một câu tiếng Anh với từ đang học",
-    writingResult: "Gợi ý sẽ khả dụng khi gắn LanguageTool hoặc AI backend.",
+    writingResult: "LanguageTool sẽ kiểm tra grammar, spelling và gợi ý sửa câu.",
+    checkWriting: "Kiểm tra câu",
+    noWritingIssues: "Chưa thấy lỗi rõ ràng.",
+    cloudSync: "Đồng bộ cloud",
+    supabaseUrl: "Supabase URL",
+    supabaseKey: "Supabase anon key",
+    email: "Email",
+    sendLogin: "Gửi link đăng nhập",
+    syncUp: "Lưu lên cloud",
+    syncDown: "Tải từ cloud",
+    cloudReady: "Đã kết nối cloud",
+    cloudMissing: "Chưa cấu hình Supabase",
+    loginSent: "Đã gửi link đăng nhập",
+    syncDone: "Đã đồng bộ",
+    syncFailed: "Đồng bộ chưa thành công",
     selected: "Đang chọn",
     nextReview: "Ôn lại",
     todayQueue: "Queue hôm nay",
@@ -68,12 +96,14 @@ const labels = {
     navToday: "Today",
     navVocab: "Vocab",
     navGrammar: "Grammar",
+    navExercises: "Practice",
     navProgress: "Progress",
     navSettings: "Settings",
     todayTitle: "Today",
     todaySub: "New words, review queue, streak, and daily target.",
     start: "Start",
     nextWord: "Next",
+    shuffle: "Shuffle",
     lookup: "Lookup",
     lookupPlaceholder: "Enter an English word",
     source: "Source",
@@ -114,9 +144,35 @@ const labels = {
     installNote: "Static PWA, works on iPhone/iPad via Add to Home Screen.",
     attribution: "Dictionary data: dictionaryapi.dev",
     grammarPractice: "Quick practice",
+    nextQuestion: "Next question",
+    tryAgain: "Try again",
+    explanation: "Explanation",
+    exercisesTitle: "Exercises",
+    exercisesSub: "Quizzes from vocabulary and grammar you have studied.",
+    profile: "Learner",
+    addProfile: "Add learner",
+    profileName: "Learner name",
+    activeProfile: "Active",
+    dailyLesson: "Today's lesson",
+    lessonReady: "Today's lesson is ready",
+    reviewFirst: "Study a few words first and the app will personalize these exercises.",
     writingLab: "Writing check",
     writingPlaceholder: "Write a sentence with the current word",
-    writingResult: "Suggestions will be available after adding LanguageTool or an AI backend.",
+    writingResult: "LanguageTool will check grammar, spelling, and wording suggestions.",
+    checkWriting: "Check sentence",
+    noWritingIssues: "No clear issue found.",
+    cloudSync: "Cloud sync",
+    supabaseUrl: "Supabase URL",
+    supabaseKey: "Supabase anon key",
+    email: "Email",
+    sendLogin: "Send login link",
+    syncUp: "Save to cloud",
+    syncDown: "Load from cloud",
+    cloudReady: "Cloud connected",
+    cloudMissing: "Supabase is not configured",
+    loginSent: "Login link sent",
+    syncDone: "Synced",
+    syncFailed: "Sync failed",
     selected: "Selected",
     nextReview: "Review",
     todayQueue: "Today queue",
@@ -617,6 +673,9 @@ const defaultState = {
   locale: "vi",
   activeTab: "today",
   currentIndex: 0,
+  profiles: [{ id: "me", name: "Tôi" }],
+  activeProfileId: "me",
+  profileStore: {},
   goal: "Study",
   level: "Intermediate",
   dailyTarget: 6,
@@ -624,10 +683,25 @@ const defaultState = {
   sessions: {},
   saved: [],
   dictionaryCache: {},
+  dailyLessons: {},
   selectedGrammar: "modal-requests",
   grammarAnswers: {},
+  grammarPractice: {},
   placementAnswers: {},
   placementResult: null,
+  exerciseIndex: 0,
+  exerciseAnswer: null,
+  exerciseStats: { total: 0, correct: 0 },
+  writingText: "",
+  writingMatches: [],
+  cloud: {
+    supabaseUrl: "",
+    supabaseAnonKey: "",
+    email: "",
+    userId: "",
+    lastSyncAt: "",
+    status: "",
+  },
 };
 
 let state = loadState();
@@ -638,35 +712,186 @@ const profileLine = document.querySelector("#profileLine");
 const localeButton = document.querySelector("#localeButton");
 const speakButton = document.querySelector("#speakButton");
 const navItems = [...document.querySelectorAll(".nav-item")];
+const profileKeys = [
+  "currentIndex",
+  "goal",
+  "level",
+  "dailyTarget",
+  "learned",
+  "sessions",
+  "saved",
+  "dictionaryCache",
+  "dailyLessons",
+  "selectedGrammar",
+  "grammarAnswers",
+  "grammarPractice",
+  "placementAnswers",
+  "placementResult",
+  "exerciseIndex",
+  "exerciseAnswer",
+  "exerciseStats",
+  "writingText",
+  "writingMatches",
+];
 
 function freshDefaultState() {
   return JSON.parse(JSON.stringify(defaultState));
+}
+
+function freshProfileState() {
+  const base = freshDefaultState();
+  return Object.fromEntries(profileKeys.map((key) => [key, base[key]]));
+}
+
+function readProfileSnapshot(source = state) {
+  return Object.fromEntries(profileKeys.map((key) => [key, JSON.parse(JSON.stringify(source[key]))]));
+}
+
+function applyProfileSnapshot(profileId) {
+  const snapshot = state.profileStore?.[profileId] || freshProfileState();
+  profileKeys.forEach((key) => {
+    state[key] = JSON.parse(JSON.stringify(snapshot[key]));
+  });
+}
+
+function persistActiveProfile() {
+  state.profileStore ||= {};
+  state.profileStore[state.activeProfileId] = readProfileSnapshot();
 }
 
 function loadState() {
   try {
     const base = freshDefaultState();
     const savedState = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return {
+    const nextState = {
       ...base,
       ...savedState,
       learned: { ...base.learned, ...(savedState?.learned || {}) },
       sessions: { ...base.sessions, ...(savedState?.sessions || {}) },
       dictionaryCache: { ...base.dictionaryCache, ...(savedState?.dictionaryCache || {}) },
+      dailyLessons: { ...base.dailyLessons, ...(savedState?.dailyLessons || {}) },
       grammarAnswers: { ...base.grammarAnswers, ...(savedState?.grammarAnswers || {}) },
+      grammarPractice: { ...base.grammarPractice, ...(savedState?.grammarPractice || {}) },
       placementAnswers: { ...base.placementAnswers, ...(savedState?.placementAnswers || {}) },
+      exerciseStats: { ...base.exerciseStats, ...(savedState?.exerciseStats || {}) },
+      writingMatches: savedState?.writingMatches || base.writingMatches,
+      cloud: { ...base.cloud, ...(savedState?.cloud || {}) },
     };
+    nextState.profiles = savedState?.profiles?.length ? savedState.profiles : base.profiles;
+    nextState.activeProfileId = savedState?.activeProfileId || nextState.profiles[0].id;
+    nextState.profileStore = savedState?.profileStore || {
+      [nextState.activeProfileId]: readProfileSnapshot(nextState),
+    };
+    const snapshot = nextState.profileStore[nextState.activeProfileId] || readProfileSnapshot(nextState);
+    profileKeys.forEach((key) => {
+      nextState[key] = JSON.parse(JSON.stringify(snapshot[key]));
+    });
+    return nextState;
   } catch {
     return freshDefaultState();
   }
 }
 
 function saveState() {
+  persistActiveProfile();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getSupabaseClient() {
+  if (!state.cloud?.supabaseUrl || !state.cloud?.supabaseAnonKey || !window.supabase?.createClient) return null;
+  window.__englishLabSupabase ||= window.supabase.createClient(state.cloud.supabaseUrl, state.cloud.supabaseAnonKey, {
+    auth: { persistSession: true, detectSessionInUrl: true },
+  });
+  return window.__englishLabSupabase;
+}
+
+function serializableCloudState() {
+  persistActiveProfile();
+  const { cloud, ...rest } = state;
+  return rest;
+}
+
+async function refreshCloudSession() {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  const { data } = await client.auth.getSession();
+  const userId = data?.session?.user?.id || "";
+  if (userId && state.cloud.userId !== userId) {
+    state.cloud.userId = userId;
+    saveState();
+  }
+  return data?.session || null;
+}
+
+async function sendLoginLink(email) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase not configured");
+  const redirectTo = `${location.origin}${location.pathname}`;
+  const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
+  if (error) throw error;
+}
+
+async function syncUpToCloud() {
+  const client = getSupabaseClient();
+  const session = await refreshCloudSession();
+  if (!client || !session?.user?.id) throw new Error("No cloud session");
+  const { error } = await client.from("learning_states").upsert({
+    user_id: session.user.id,
+    state: serializableCloudState(),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  state.cloud.lastSyncAt = new Date().toISOString();
+  state.cloud.status = "ok";
+  saveState();
+}
+
+async function syncDownFromCloud() {
+  const client = getSupabaseClient();
+  const session = await refreshCloudSession();
+  if (!client || !session?.user?.id) throw new Error("No cloud session");
+  const { data, error } = await client.from("learning_states").select("state").eq("user_id", session.user.id).single();
+  if (error && error.code !== "PGRST116") throw error;
+  if (data?.state) {
+    const cloud = state.cloud;
+    state = { ...freshDefaultState(), ...data.state, cloud };
+    applyProfileSnapshot(state.activeProfileId);
+  }
+  state.cloud.lastSyncAt = new Date().toISOString();
+  state.cloud.status = "ok";
+  saveState();
 }
 
 function t(key) {
   return labels[state.locale][key] || labels.vi[key] || key;
+}
+
+function getActiveProfile() {
+  return state.profiles.find((profile) => profile.id === state.activeProfileId) || state.profiles[0];
+}
+
+function switchProfile(profileId) {
+  if (!state.profiles.some((profile) => profile.id === profileId)) return;
+  persistActiveProfile();
+  state.activeProfileId = profileId;
+  state.profileStore ||= {};
+  state.profileStore[profileId] ||= freshProfileState();
+  applyProfileSnapshot(profileId);
+  saveState();
+  render();
+}
+
+function addProfile(name) {
+  const cleanName = name.trim().slice(0, 28);
+  if (!cleanName) return;
+  persistActiveProfile();
+  const id = `profile-${Date.now()}`;
+  state.profiles.push({ id, name: cleanName });
+  state.profileStore[id] = freshProfileState();
+  state.activeProfileId = id;
+  applyProfileSnapshot(id);
+  saveState();
+  render();
 }
 
 function dateKey(date = new Date()) {
@@ -706,9 +931,54 @@ function getPool() {
   return allowed.length ? allowed : vocabulary.filter(isLevelAllowed);
 }
 
+function seededNumber(seed) {
+  let hash = 2166136261;
+  for (const char of seed) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function seededShuffle(items, seed) {
+  const shuffled = [...items];
+  let value = seededNumber(seed) || 1;
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    const swapIndex = value % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function getDailyLesson(day = dateKey()) {
+  state.dailyLessons ||= {};
+  if (state.dailyLessons[day]?.length) return state.dailyLessons[day];
+  const dueWords = getDueWords();
+  const learnedWords = new Set(Object.keys(state.learned));
+  const newWords = seededShuffle(
+    getPool()
+      .filter((item) => !learnedWords.has(item.word))
+      .map((item) => item.word),
+    `${state.activeProfileId}:${state.goal}:${state.level}:${day}`,
+  );
+  const backupWords = seededShuffle(
+    getPool().map((item) => item.word),
+    `${state.activeProfileId}:backup:${day}`,
+  );
+  const lesson = [...new Set([...dueWords, ...newWords, ...backupWords])].slice(0, Math.max(state.dailyTarget, 4));
+  state.dailyLessons[day] = lesson;
+  saveState();
+  return lesson;
+}
+
+function getWordByText(word) {
+  return vocabulary.find((item) => item.word === word) || getPool()[0] || vocabulary[0];
+}
+
 function getCurrentWord() {
-  const pool = getPool();
-  return pool[state.currentIndex % pool.length] || vocabulary[0];
+  const source = state.activeTab === "today" ? getDailyLesson().map(getWordByText) : getPool();
+  return source[state.currentIndex % source.length] || vocabulary[0];
 }
 
 function getLearnedEntries() {
@@ -825,8 +1095,21 @@ function setTab(tab) {
 }
 
 function nextWord() {
-  const pool = getPool();
+  const pool = state.activeTab === "today" ? getDailyLesson().map(getWordByText) : getPool();
   state.currentIndex = (state.currentIndex + 1) % pool.length;
+  saveState();
+  render();
+}
+
+function shuffleWord() {
+  const pool = state.activeTab === "today" ? getDailyLesson().map(getWordByText) : getPool();
+  const currentWord = getCurrentWord().word;
+  if (pool.length <= 1) return;
+  let nextIndex = state.currentIndex;
+  while (pool[nextIndex % pool.length]?.word === currentWord) {
+    nextIndex = Math.floor(Math.random() * pool.length);
+  }
+  state.currentIndex = nextIndex;
   saveState();
   render();
 }
@@ -834,7 +1117,7 @@ function nextWord() {
 function syncChrome() {
   document.documentElement.lang = state.locale;
   localeButton.textContent = state.locale.toUpperCase();
-  profileLine.textContent = `${state.goal} · ${state.level}`;
+  profileLine.textContent = `${getActiveProfile()?.name || "Tôi"} · ${state.goal} · ${state.level}`;
   navItems.forEach((item) => {
     const isActive = item.dataset.tab === state.activeTab;
     item.classList.toggle("is-active", isActive);
@@ -912,7 +1195,10 @@ function renderDashboardBand() {
           <h1>${t("todayTitle")}</h1>
           <p>${t("todaySub")}</p>
         </div>
-        <button class="primary-button" type="button" data-action="next">${t("nextWord")}</button>
+        <div class="inline-actions">
+          <button class="secondary-button" type="button" data-action="shuffle">${t("shuffle")}</button>
+          <button class="primary-button" type="button" data-action="next">${t("nextWord")}</button>
+        </div>
       </div>
       <div class="metric-row">
         <div class="metric"><strong>${stats.streak}</strong><small>${t("streak")}</small></div>
@@ -929,8 +1215,7 @@ function renderDashboardBand() {
 
 function renderToday() {
   const item = getCurrentWord();
-  const dueWords = getDueWords();
-  const queue = dueWords.length ? dueWords : getPool().slice(0, state.dailyTarget).map((word) => word.word);
+  const queue = getDailyLesson();
   app.innerHTML = `
     <div class="view split-view">
       <div class="view">
@@ -939,7 +1224,7 @@ function renderToday() {
       </div>
       <aside class="view">
         <section class="progress-card">
-          <h3>${t("todayQueue")}</h3>
+          <h3>${t("dailyLesson")}</h3>
           ${renderWordList(queue.slice(0, 8), t("noDue"))}
         </section>
         ${renderLookupCard(item.word)}
@@ -959,7 +1244,10 @@ function renderVocab() {
             <h1>${t("vocabTitle")}</h1>
             <p>${state.goal} · ${state.level}</p>
           </div>
-          <button class="primary-button" type="button" data-action="next">${t("nextWord")}</button>
+          <div class="inline-actions">
+            <button class="secondary-button" type="button" data-action="shuffle">${t("shuffle")}</button>
+            <button class="primary-button" type="button" data-action="next">${t("nextWord")}</button>
+          </div>
         </div>
         ${renderWordCard(item)}
       </div>
@@ -997,7 +1285,7 @@ function renderDictionaryResult(entry) {
     <p><strong>${escapeHtml(entry.partOfSpeech || "")}</strong> ${escapeHtml(entry.definition || "")}</p>
     ${entry.example ? `<div class="example-block"><p>${escapeHtml(entry.example)}</p></div>` : ""}
     ${synonyms}
-    ${entry.audio ? `<button class="secondary-button" type="button" data-audio="${escapeHtml(entry.audio)}">${t("pronunciation")}</button>` : ""}
+    <button class="secondary-button" type="button" data-speak-word="${escapeHtml(entry.word)}">${t("pronunciation")}</button>
   `;
 }
 
@@ -1044,35 +1332,196 @@ function renderGrammar() {
 }
 
 function renderGrammarQuiz(topic) {
-  const answer = state.grammarAnswers[topic.id];
+  const quizzes = getTopicQuizzes(topic);
+  state.grammarPractice[topic.id] ||= { index: 0, selected: null, total: 0, correct: 0 };
+  const practice = state.grammarPractice[topic.id];
+  const quiz = quizzes[practice.index % quizzes.length];
+  const answer = practice.selected;
   return `
     <section class="progress-card">
       <h3>${t("grammarPractice")}</h3>
-      <p>${escapeHtml(topic.quiz.question)}</p>
+      <p>${escapeHtml(quiz.question)}</p>
       <div class="choice-grid">
-        ${topic.quiz.choices
+        ${quiz.choices
           .map((choice) => {
             const isAnswered = Boolean(answer);
-            const isCorrect = answer === choice && choice === topic.quiz.answer;
-            const isWrong = answer === choice && choice !== topic.quiz.answer;
+            const isCorrect = answer === choice && choice === quiz.answer;
+            const isWrong = answer === choice && choice !== quiz.answer;
             return `<button class="choice-button ${isCorrect ? "is-correct" : ""} ${isWrong ? "is-wrong" : ""}" type="button" data-quiz-topic="${topic.id}" data-choice="${escapeHtml(choice)}" ${isAnswered ? "disabled" : ""}>${escapeHtml(choice)}</button>`;
           })
           .join("")}
       </div>
-      ${answer ? `<p>${answer === topic.quiz.answer ? t("correct") : t("wrong")}: ${escapeHtml(topic.quiz.answer)}</p>` : ""}
+      ${
+        answer
+          ? `<p>${answer === quiz.answer ? t("correct") : t("wrong")}: ${escapeHtml(quiz.answer)}</p><p><strong>${t("explanation")}:</strong> ${escapeHtml(quiz.explanation)}</p><button class="secondary-button" type="button" data-next-quiz="${topic.id}">${t("nextQuestion")}</button>`
+          : ""
+      }
     </section>
   `;
+}
+
+function getTopicQuizzes(topic) {
+  const base = [
+    {
+      ...topic.quiz,
+      explanation: topic.focus[0] || topic.titleEn,
+    },
+  ];
+  if (topic.id === "modal-requests") {
+    base.push(
+      {
+        question: "___ you summarize the article?",
+        choices: ["Could", "Because", "Although"],
+        answer: "Could",
+        explanation: "Dùng Could you + verb để yêu cầu lịch sự.",
+      },
+      {
+        question: "Please ___ the booking details.",
+        choices: ["confirm", "confirmation", "confirmed"],
+        answer: "confirm",
+        explanation: "Sau Please dùng động từ nguyên mẫu.",
+      },
+    );
+  }
+  if (topic.id === "before-gerund") {
+    base.push(
+      {
+        question: "Prioritize useful words before ___ rare ones.",
+        choices: ["memorizing", "memorize", "memorized"],
+        answer: "memorizing",
+        explanation: "Sau before dùng V-ing khi nói về hành động.",
+      },
+      {
+        question: "Evaluate the options before ___ a tool.",
+        choices: ["choosing", "choose", "chosen"],
+        answer: "choosing",
+        explanation: "before + V-ing: trước khi làm gì.",
+      },
+    );
+  }
+  if (topic.id === "that-clauses") {
+    base.push(
+      {
+        question: "Do not assume ___ everyone learns the same way.",
+        choices: ["that", "than", "which"],
+        answer: "that",
+        explanation: "assume that + clause để nói điều được giả định.",
+      },
+      {
+        question: "The report provides evidence ___ the plan works.",
+        choices: ["that", "what", "when"],
+        answer: "that",
+        explanation: "evidence that + clause để nêu bằng chứng cho một kết luận.",
+      },
+    );
+  }
+  if (topic.id === "comparatives") {
+    base.push(
+      {
+        question: "This approach is ___ efficient.",
+        choices: ["more", "most", "many"],
+        answer: "more",
+        explanation: "Tính từ dài thường dùng more + adjective.",
+      },
+      {
+        question: "The sentence is ___ to understand now.",
+        choices: ["easier", "easy", "easiest"],
+        answer: "easier",
+        explanation: "So sánh hơn của easy là easier.",
+      },
+    );
+  }
+  return base;
 }
 
 function renderWritingLab() {
   return `
     <section class="settings-card">
       <h3>${t("writingLab")}</h3>
-      <div class="field">
-        <textarea placeholder="${t("writingPlaceholder")}"></textarea>
-      </div>
+      <form class="view" data-writing-form>
+        <div class="field">
+          <textarea name="writingText" placeholder="${t("writingPlaceholder")}">${escapeHtml(state.writingText || "")}</textarea>
+        </div>
+        <button class="secondary-button" type="submit">${t("checkWriting")}</button>
+      </form>
       <p>${t("writingResult")}</p>
+      ${state.writingText ? renderWritingMatches() : ""}
     </section>
+  `;
+}
+
+function buildExerciseQuestions() {
+  const learnedWords = Object.keys(state.learned);
+  const source = learnedWords.length ? learnedWords.map(getWordByText) : getDailyLesson().map(getWordByText);
+  return source.flatMap((item, index) => {
+    const distractors = seededShuffle(
+      vocabulary.filter((word) => word.word !== item.word).map((word) => (state.locale === "vi" ? word.vi : word.en)),
+      `${item.word}:meaning:${index}`,
+    ).slice(0, 2);
+    const meaningAnswer = state.locale === "vi" ? item.vi : item.en;
+    const fillChoices = seededShuffle([item.word, ...seededShuffle(getPool().filter((word) => word.word !== item.word).map((word) => word.word), `${item.word}:fill`).slice(0, 2)], `${item.word}:choices`);
+    return [
+      {
+        type: "meaning",
+        question: state.locale === "vi" ? `Từ "${item.word}" gần nghĩa với câu nào?` : `What does "${item.word}" mean?`,
+        choices: seededShuffle([meaningAnswer, ...distractors], `${item.word}:meaningChoices`),
+        answer: meaningAnswer,
+        explanation: `${item.word}: ${meaningAnswer}`,
+      },
+      {
+        type: "blank",
+        question: item.example.replace(new RegExp(`\\b${item.word}\\b`, "i"), "_____"),
+        choices: fillChoices,
+        answer: item.word,
+        explanation: item.exampleVi,
+      },
+    ];
+  });
+}
+
+function renderExercises() {
+  const questions = buildExerciseQuestions();
+  const question = questions[state.exerciseIndex % questions.length];
+  const answer = state.exerciseAnswer;
+  app.innerHTML = `
+    <div class="view split-view">
+      <div class="view">
+        <div class="section-title">
+          <div>
+            <h1>${t("exercisesTitle")}</h1>
+            <p>${t("exercisesSub")}</p>
+          </div>
+        </div>
+        <section class="word-card">
+          <span class="pill">${question.type}</span>
+          <p class="word-meaning">${escapeHtml(question.question)}</p>
+          <div class="choice-grid">
+            ${question.choices
+              .map((choice) => {
+                const isCorrect = answer === choice && choice === question.answer;
+                const isWrong = answer === choice && choice !== question.answer;
+                return `<button class="choice-button ${isCorrect ? "is-correct" : ""} ${isWrong ? "is-wrong" : ""}" type="button" data-exercise-choice="${escapeHtml(choice)}" ${answer ? "disabled" : ""}>${escapeHtml(choice)}</button>`;
+              })
+              .join("")}
+          </div>
+          ${
+            answer
+              ? `<p>${answer === question.answer ? t("correct") : t("wrong")}: ${escapeHtml(question.answer)}</p><p><strong>${t("explanation")}:</strong> ${escapeHtml(question.explanation)}</p><button class="primary-button" type="button" data-action="next-exercise">${t("nextQuestion")}</button>`
+              : ""
+          }
+        </section>
+      </div>
+      <aside class="view">
+        <section class="progress-card">
+          <h3>${t("progressTitle")}</h3>
+          <p>${state.exerciseStats.correct}/${state.exerciseStats.total} ${t("correct")}</p>
+        </section>
+        <section class="progress-card">
+          <h3>${t("dailyLesson")}</h3>
+          ${renderWordList(getDailyLesson(), t("reviewFirst"))}
+        </section>
+      </aside>
+    </div>
   `;
 }
 
@@ -1153,6 +1602,21 @@ function renderSettings() {
         </div>
       </div>
       <section class="settings-card">
+        <h3>${t("profile")}</h3>
+        <div class="profile-strip">
+          ${state.profiles
+            .map(
+              (profile) =>
+                `<button class="profile-button ${profile.id === state.activeProfileId ? "is-active" : ""}" type="button" data-profile-id="${profile.id}">${escapeHtml(profile.name)}</button>`,
+            )
+            .join("")}
+        </div>
+        <form class="lookup-form" data-profile-form>
+          <input name="profileName" type="text" placeholder="${t("profileName")}" />
+          <button class="secondary-button" type="submit">＋</button>
+        </form>
+      </section>
+      <section class="settings-card">
         <form class="settings-grid" data-settings-form>
           <div class="field">
             <label for="goal">${t("goal")}</label>
@@ -1175,6 +1639,33 @@ function renderSettings() {
             <button class="primary-button" type="submit">${t("save")}</button>
           </div>
         </form>
+      </section>
+      <section class="settings-card">
+        <h3>${t("cloudSync")}</h3>
+        <p>${state.cloud?.userId ? t("cloudReady") : t("cloudMissing")}</p>
+        <form class="settings-grid" data-cloud-form>
+          <div class="field">
+            <label for="supabaseUrl">${t("supabaseUrl")}</label>
+            <input id="supabaseUrl" name="supabaseUrl" type="url" value="${escapeHtml(state.cloud.supabaseUrl)}" placeholder="https://xxxx.supabase.co" />
+          </div>
+          <div class="field">
+            <label for="supabaseAnonKey">${t("supabaseKey")}</label>
+            <input id="supabaseAnonKey" name="supabaseAnonKey" type="password" value="${escapeHtml(state.cloud.supabaseAnonKey)}" />
+          </div>
+          <div class="field">
+            <label for="email">${t("email")}</label>
+            <input id="email" name="email" type="email" value="${escapeHtml(state.cloud.email)}" />
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button class="secondary-button" type="submit">${t("save")}</button>
+          </div>
+        </form>
+        <div class="inline-actions">
+          <button class="secondary-button" type="button" data-action="send-login">${t("sendLogin")}</button>
+          <button class="secondary-button" type="button" data-action="sync-up">${t("syncUp")}</button>
+          <button class="secondary-button" type="button" data-action="sync-down">${t("syncDown")}</button>
+        </div>
       </section>
       ${renderPlacement()}
       <section class="settings-card">
@@ -1243,7 +1734,10 @@ function showToast(message) {
 }
 
 function speakCurrentWord() {
-  const word = getCurrentWord().word;
+  speakWord(getCurrentWord().word);
+}
+
+function speakWord(word) {
   if (!("speechSynthesis" in window)) return;
   const utterance = new SpeechSynthesisUtterance(word);
   utterance.lang = "en-US";
@@ -1262,6 +1756,35 @@ async function handleLookup(form) {
   } catch {
     result.innerHTML = `<p>${t("apiError")}</p>`;
   }
+}
+
+async function checkWriting(text) {
+  const params = new URLSearchParams();
+  params.set("text", text);
+  params.set("language", "en-US");
+  const response = await fetch("https://api.languagetool.org/v2/check", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params,
+  });
+  if (!response.ok) throw new Error(`LanguageTool failed: ${response.status}`);
+  const data = await response.json();
+  return data.matches || [];
+}
+
+function renderWritingMatches() {
+  if (!state.writingMatches?.length) return `<p>${t("noWritingIssues")}</p>`;
+  return `
+    <ul class="grammar-list">
+      ${state.writingMatches
+        .slice(0, 6)
+        .map((match) => {
+          const replacement = match.replacements?.[0]?.value || "";
+          return `<li><strong>${escapeHtml(match.message)}</strong><p>${escapeHtml(replacement ? `${match.context?.text || ""} → ${replacement}` : match.context?.text || "")}</p></li>`;
+        })
+        .join("")}
+    </ul>
+  `;
 }
 
 function openWord(word) {
@@ -1295,6 +1818,34 @@ function bindEvents() {
     if (!target) return;
 
     if (target.dataset.action === "next") nextWord();
+    if (target.dataset.action === "shuffle") shuffleWord();
+    if (target.dataset.action === "next-exercise") {
+      state.exerciseIndex += 1;
+      state.exerciseAnswer = null;
+      saveState();
+      render();
+    }
+    if (target.dataset.action === "send-login") {
+      sendLoginLink(state.cloud.email)
+        .then(() => showToast(t("loginSent")))
+        .catch(() => showToast(t("syncFailed")));
+    }
+    if (target.dataset.action === "sync-up") {
+      syncUpToCloud()
+        .then(() => {
+          showToast(t("syncDone"));
+          render();
+        })
+        .catch(() => showToast(t("syncFailed")));
+    }
+    if (target.dataset.action === "sync-down") {
+      syncDownFromCloud()
+        .then(() => {
+          showToast(t("syncDone"));
+          render();
+        })
+        .catch(() => showToast(t("syncFailed")));
+    }
     if (target.dataset.action === "reset") {
       localStorage.removeItem(STORAGE_KEY);
       state = freshDefaultState();
@@ -1310,7 +1861,29 @@ function bindEvents() {
       render();
     }
     if (target.dataset.quizTopic) {
-      state.grammarAnswers[target.dataset.quizTopic] = target.dataset.choice;
+      const topic = grammarTopics.find((item) => item.id === target.dataset.quizTopic);
+      const practice = state.grammarPractice[target.dataset.quizTopic] || { index: 0, selected: null, total: 0, correct: 0 };
+      const quiz = getTopicQuizzes(topic)[practice.index % getTopicQuizzes(topic).length];
+      practice.selected = target.dataset.choice;
+      practice.total += 1;
+      if (target.dataset.choice === quiz.answer) practice.correct += 1;
+      state.grammarPractice[target.dataset.quizTopic] = practice;
+      saveState();
+      render();
+    }
+    if (target.dataset.nextQuiz) {
+      const practice = state.grammarPractice[target.dataset.nextQuiz] || { index: 0, selected: null, total: 0, correct: 0 };
+      practice.index += 1;
+      practice.selected = null;
+      state.grammarPractice[target.dataset.nextQuiz] = practice;
+      saveState();
+      render();
+    }
+    if (target.dataset.exerciseChoice) {
+      const question = buildExerciseQuestions()[state.exerciseIndex % buildExerciseQuestions().length];
+      state.exerciseAnswer = target.dataset.exerciseChoice;
+      state.exerciseStats.total += 1;
+      if (target.dataset.exerciseChoice === question.answer) state.exerciseStats.correct += 1;
       saveState();
       render();
     }
@@ -1319,16 +1892,46 @@ function bindEvents() {
       saveState();
       render();
     }
-    if (target.dataset.audio) {
-      new Audio(target.dataset.audio).play();
-    }
+    if (target.dataset.profileId) switchProfile(target.dataset.profileId);
+    if (target.dataset.speakWord) speakWord(target.dataset.speakWord);
   });
 
   app.addEventListener("submit", (event) => {
     event.preventDefault();
     const lookupForm = event.target.closest("[data-lookup-form]");
     const settingsForm = event.target.closest("[data-settings-form]");
+    const profileForm = event.target.closest("[data-profile-form]");
+    const cloudForm = event.target.closest("[data-cloud-form]");
+    const writingForm = event.target.closest("[data-writing-form]");
     if (lookupForm) handleLookup(lookupForm);
+    if (profileForm) {
+      const name = new FormData(profileForm).get("profileName");
+      addProfile(String(name || ""));
+    }
+    if (cloudForm) {
+      const data = new FormData(cloudForm);
+      state.cloud.supabaseUrl = String(data.get("supabaseUrl") || "").trim();
+      state.cloud.supabaseAnonKey = String(data.get("supabaseAnonKey") || "").trim();
+      state.cloud.email = String(data.get("email") || "").trim();
+      window.__englishLabSupabase = null;
+      saveState();
+      showToast(t("profileSaved"));
+      render();
+    }
+    if (writingForm) {
+      const text = String(new FormData(writingForm).get("writingText") || "").trim();
+      state.writingText = text;
+      state.writingMatches = [];
+      saveState();
+      checkWriting(text)
+        .then((matches) => {
+          state.writingMatches = matches;
+          saveState();
+          render();
+        })
+        .catch(() => showToast(t("apiError")));
+      render();
+    }
     if (settingsForm) {
       const data = new FormData(settingsForm);
       state.goal = data.get("goal");
@@ -1347,6 +1950,7 @@ function render() {
   if (state.activeTab === "today") renderToday();
   if (state.activeTab === "vocab") renderVocab();
   if (state.activeTab === "grammar") renderGrammar();
+  if (state.activeTab === "exercises") renderExercises();
   if (state.activeTab === "progress") renderProgress();
   if (state.activeTab === "settings") renderSettings();
   syncChrome();
@@ -1360,3 +1964,4 @@ if ("serviceWorker" in navigator) {
 
 bindEvents();
 render();
+refreshCloudSession().then(() => render()).catch(() => {});

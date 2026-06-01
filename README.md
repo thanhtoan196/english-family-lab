@@ -32,3 +32,40 @@ The app calls `https://api.dictionaryapi.dev/api/v2/entries/en/<word>` from the 
 ## Data storage
 
 Progress, saved words, streaks, and settings are stored in the browser with `localStorage`.
+
+## Optional Supabase sync
+
+Create a Supabase project, then run this SQL in the Supabase SQL editor:
+
+```sql
+create table if not exists public.learning_states (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  state jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.learning_states enable row level security;
+
+create policy "Users can read their own learning state"
+on public.learning_states for select
+using (auth.uid() = user_id);
+
+create policy "Users can insert their own learning state"
+on public.learning_states for insert
+with check (auth.uid() = user_id);
+
+create policy "Users can update their own learning state"
+on public.learning_states for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+```
+
+In the app, open Settings, paste the Supabase project URL and anon key, enter your email, then send a login link. After login, use "Save to cloud" and "Load from cloud".
+
+## Writing check
+
+The writing checker calls the public LanguageTool API:
+
+```text
+https://api.languagetool.org/v2/check
+```

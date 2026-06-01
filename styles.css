@@ -709,7 +709,7 @@ textarea:focus-visible {
   left: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   min-height: calc(var(--nav-height) + env(safe-area-inset-bottom));
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(216, 222, 230, 0.9);
@@ -730,6 +730,35 @@ textarea:focus-visible {
   background: transparent;
   font-size: 0.74rem;
   font-weight: 740;
+}
+
+.profile-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.profile-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.profile-button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--surface);
+  font-weight: 760;
+}
+
+.profile-button.is-active {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .nav-icon {
