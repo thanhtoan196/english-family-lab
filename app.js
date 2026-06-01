@@ -1,5 +1,8 @@
 const STORAGE_KEY = "english-family-lab:v1";
 const API_BASE = "https://api.dictionaryapi.dev/api/v2/entries/en/";
+const APP_SUPABASE_URL = "https://edsqwiyxqcqnpaazjjgd.supabase.co";
+const APP_SUPABASE_ANON_KEY = "sb_publishable_LCNQQ5l24AXCor81vDGSuQ_oczb_x6t";
+const ADMIN_EMAILS = ["thanhtoan196@gmail.com"];
 
 const labels = {
   vi: {
@@ -88,6 +91,17 @@ const labels = {
     cloudNeedLogin: "Chưa đăng nhập cloud. Bấm Gửi link đăng nhập trước.",
     cloudNeedConfig: "Thiếu Supabase URL hoặc anon key.",
     cloudNeedEmail: "Thiếu email đăng nhập.",
+    authTitle: "Đăng nhập để lưu tiến độ",
+    authSub: "Mỗi người dùng email và mật khẩu riêng. App sẽ lưu bài học, streak và cài đặt theo tài khoản.",
+    password: "Mật khẩu",
+    signIn: "Đăng nhập",
+    signUp: "Tạo tài khoản",
+    signOut: "Đăng xuất",
+    useSignIn: "Tôi đã có tài khoản",
+    useSignUp: "Tạo tài khoản mới",
+    adminSettings: "Admin",
+    learnerSettings: "Cài đặt học tập",
+    authNeedConfig: "Chưa nhúng Supabase publishable key vào app.",
     selected: "Đang chọn",
     nextReview: "Ôn lại",
     todayQueue: "Queue hôm nay",
@@ -183,6 +197,17 @@ const labels = {
     cloudNeedLogin: "Not signed in. Send a login link first.",
     cloudNeedConfig: "Supabase URL or anon key is missing.",
     cloudNeedEmail: "Email is missing.",
+    authTitle: "Sign in to save progress",
+    authSub: "Each learner uses a separate email and password. The app saves lessons, streaks, and settings per account.",
+    password: "Password",
+    signIn: "Sign in",
+    signUp: "Create account",
+    signOut: "Sign out",
+    useSignIn: "I already have an account",
+    useSignUp: "Create a new account",
+    adminSettings: "Admin",
+    learnerSettings: "Learning settings",
+    authNeedConfig: "Supabase publishable key is not embedded yet.",
     selected: "Selected",
     nextReview: "Review",
     todayQueue: "Today queue",
@@ -704,6 +729,7 @@ const defaultState = {
   exerciseStats: { total: 0, correct: 0 },
   writingText: "",
   writingMatches: [],
+  authMode: "signIn",
   cloud: {
     supabaseUrl: "",
     supabaseAnonKey: "",
@@ -822,6 +848,26 @@ function readCloudFormIntoState() {
   saveState();
 }
 
+function supabaseConfig() {
+  return {
+    url: APP_SUPABASE_URL || state.cloud?.supabaseUrl || "",
+    key: APP_SUPABASE_ANON_KEY || state.cloud?.supabaseAnonKey || "",
+  };
+}
+
+function isSupabaseConfigured() {
+  const config = supabaseConfig();
+  return Boolean(config.url && config.key);
+}
+
+function requiresAuth() {
+  return isSupabaseConfigured();
+}
+
+function isAdmin() {
+  return ADMIN_EMAILS.includes(String(state.cloud?.email || "").toLowerCase());
+}
+
 function recordCloudError(error) {
   const message = error?.message || t("syncFailed");
   state.cloud.status = message;
@@ -832,14 +878,15 @@ function recordCloudError(error) {
 
 function cloudStatusText() {
   if (state.cloud?.userId) return t("cloudReady");
-  if (state.cloud?.supabaseUrl && state.cloud?.supabaseAnonKey) return t("cloudConfigured");
+  if (isSupabaseConfigured()) return t("cloudConfigured");
   return t("cloudMissing");
 }
 
 function getSupabaseClient() {
-  if (!state.cloud?.supabaseUrl || !state.cloud?.supabaseAnonKey) throw new Error(t("cloudNeedConfig"));
+  const config = supabaseConfig();
+  if (!config.url || !config.key) throw new Error(t("cloudNeedConfig"));
   if (!window.supabase?.createClient) throw new Error("Supabase library is not loaded");
-  window.__englishLabSupabase ||= window.supabase.createClient(state.cloud.supabaseUrl, state.cloud.supabaseAnonKey, {
+  window.__englishLabSupabase ||= window.supabase.createClient(config.url, config.key, {
     auth: { persistSession: true, detectSessionInUrl: true },
   });
   return window.__englishLabSupabase;
@@ -855,11 +902,52 @@ async function refreshCloudSession() {
   const client = getSupabaseClient();
   const { data } = await client.auth.getSession();
   const userId = data?.session?.user?.id || "";
+  const email = data?.session?.user?.email || "";
   if (userId && state.cloud.userId !== userId) {
     state.cloud.userId = userId;
+  }
+  if (email && state.cloud.email !== email) {
+    state.cloud.email = email;
     saveState();
   }
   return data?.session || null;
+}
+
+async function signUpWithPassword(email, password) {
+  const client = getSupabaseClient();
+  if (!email) throw new Error(t("cloudNeedEmail"));
+  if (!password) throw new Error(t("password"));
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${location.origin}${location.pathname}` },
+  });
+  if (error) throw error;
+  state.cloud.email = data?.user?.email || email;
+  state.cloud.userId = data?.user?.id || state.cloud.userId;
+  saveState();
+  return data;
+}
+
+async function signInWithPassword(email, password) {
+  const client = getSupabaseClient();
+  if (!email) throw new Error(t("cloudNeedEmail"));
+  if (!password) throw new Error(t("password"));
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  state.cloud.email = data?.user?.email || email;
+  state.cloud.userId = data?.user?.id || "";
+  saveState();
+  await syncDownFromCloud().catch(() => {});
+  return data;
+}
+
+async function signOut() {
+  const client = getSupabaseClient();
+  await client.auth.signOut();
+  state.cloud.userId = "";
+  state.cloud.email = "";
+  saveState();
 }
 
 async function sendLoginLink(email) {
@@ -1156,7 +1244,9 @@ function shuffleWord() {
 function syncChrome() {
   document.documentElement.lang = state.locale;
   localeButton.textContent = state.locale.toUpperCase();
-  profileLine.textContent = `${getActiveProfile()?.name || "Tôi"} · ${state.goal} · ${state.level}`;
+  profileLine.textContent = state.cloud?.userId
+    ? `${getActiveProfile()?.name || "Tôi"} · ${state.goal} · ${state.level}`
+    : t("authTitle");
   navItems.forEach((item) => {
     const isActive = item.dataset.tab === state.activeTab;
     item.classList.toggle("is-active", isActive);
@@ -1631,6 +1721,44 @@ function renderWordList(words, emptyText) {
   `;
 }
 
+function renderAuth() {
+  const isSignUp = state.authMode === "signUp";
+  app.innerHTML = `
+    <div class="view split-view">
+      <section class="word-card">
+        <span class="pill">English Family Lab</span>
+        <h1>${t("authTitle")}</h1>
+        <p class="word-note">${t("authSub")}</p>
+        ${!isSupabaseConfigured() ? `<p class="status-pill">${t("authNeedConfig")}</p>` : ""}
+        <form class="view" data-auth-form>
+          <div class="field">
+            <label for="authEmail">${t("email")}</label>
+            <input id="authEmail" name="email" type="email" autocomplete="email" value="${escapeHtml(state.cloud.email)}" required />
+          </div>
+          <div class="field">
+            <label for="authPassword">${t("password")}</label>
+            <input id="authPassword" name="password" type="password" autocomplete="${isSignUp ? "new-password" : "current-password"}" minlength="6" required />
+          </div>
+          <button class="primary-button" type="submit">${isSignUp ? t("signUp") : t("signIn")}</button>
+        </form>
+        <button class="text-button" type="button" data-action="${isSignUp ? "auth-signin" : "auth-signup"}">
+          ${isSignUp ? t("useSignIn") : t("useSignUp")}
+        </button>
+      </section>
+      <aside class="view">
+        <section class="progress-card">
+          <h3>${t("dailyLesson")}</h3>
+          <p>${t("lessonReady")}</p>
+        </section>
+        <section class="progress-card">
+          <h3>${t("profile")}</h3>
+          <p>${t("familyGoal")}</p>
+        </section>
+      </aside>
+    </div>
+  `;
+}
+
 function renderSettings() {
   app.innerHTML = `
     <div class="view">
@@ -1656,6 +1784,7 @@ function renderSettings() {
         </form>
       </section>
       <section class="settings-card">
+        <h3>${t("learnerSettings")}</h3>
         <form class="settings-grid" data-settings-form>
           <div class="field">
             <label for="goal">${t("goal")}</label>
@@ -1679,7 +1808,9 @@ function renderSettings() {
           </div>
         </form>
       </section>
-      <section class="settings-card">
+      ${
+        isAdmin()
+          ? `<section class="settings-card">
         <h3>${t("cloudSync")}</h3>
         <p>${cloudStatusText()}</p>
         ${
@@ -1710,16 +1841,23 @@ function renderSettings() {
           <button class="secondary-button" type="button" data-action="send-login">${t("sendLogin")}</button>
           <button class="secondary-button" type="button" data-action="sync-up">${t("syncUp")}</button>
           <button class="secondary-button" type="button" data-action="sync-down">${t("syncDown")}</button>
+          <button class="secondary-button" type="button" data-action="sign-out">${t("signOut")}</button>
         </div>
-      </section>
+      </section>`
+          : `<section class="settings-card"><h3>${t("cloudSync")}</h3><p>${cloudStatusText()}</p><button class="secondary-button" type="button" data-action="sign-out">${t("signOut")}</button></section>`
+      }
       ${renderPlacement()}
-      <section class="settings-card">
+      ${
+        isAdmin()
+          ? `<section class="settings-card">
         <h3>${t("source")}</h3>
         <p>${t("attribution")}</p>
         <div class="inline-actions">
           <button class="secondary-button" type="button" data-action="reset">${t("reset")}</button>
         </div>
-      </section>
+      </section>`
+          : ""
+      }
     </div>
   `;
 }
@@ -1870,6 +2008,21 @@ function bindEvents() {
       saveState();
       render();
     }
+    if (target.dataset.action === "auth-signup") {
+      state.authMode = "signUp";
+      saveState();
+      render();
+    }
+    if (target.dataset.action === "auth-signin") {
+      state.authMode = "signIn";
+      saveState();
+      render();
+    }
+    if (target.dataset.action === "sign-out") {
+      signOut()
+        .then(() => render())
+        .catch(recordCloudError);
+    }
     if (target.dataset.action === "send-login") {
       readCloudFormIntoState();
       sendLoginLink(state.cloud.email)
@@ -1951,6 +2104,19 @@ function bindEvents() {
     const profileForm = event.target.closest("[data-profile-form]");
     const cloudForm = event.target.closest("[data-cloud-form]");
     const writingForm = event.target.closest("[data-writing-form]");
+    const authForm = event.target.closest("[data-auth-form]");
+    if (authForm) {
+      const data = new FormData(authForm);
+      const email = String(data.get("email") || "").trim();
+      const password = String(data.get("password") || "");
+      const action = state.authMode === "signUp" ? signUpWithPassword : signInWithPassword;
+      action(email, password)
+        .then(() => {
+          showToast(state.authMode === "signUp" ? t("signUp") : t("signIn"));
+          render();
+        })
+        .catch(recordCloudError);
+    }
     if (lookupForm) handleLookup(lookupForm);
     if (profileForm) {
       const name = new FormData(profileForm).get("profileName");
@@ -1992,6 +2158,11 @@ function bindEvents() {
 
 function render() {
   syncChrome();
+  if (requiresAuth() && !state.cloud?.userId) {
+    renderAuth();
+    syncChrome();
+    return;
+  }
   if (state.activeTab === "today") renderToday();
   if (state.activeTab === "vocab") renderVocab();
   if (state.activeTab === "grammar") renderGrammar();
